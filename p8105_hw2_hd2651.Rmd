@@ -1,0 +1,381 @@
+---
+title: "Homework 2"
+author: "Haoyuan Dou"
+date: "2026-10-06"
+output: github_document
+---
+
+```{r}
+library(tidyverse)
+library(janitor)
+library(readxl)
+```
+
+# Problem 1
+```{r}
+
+subway_df = 
+  read_csv(
+    "data/NYC_Transit_Subway_Entrance_And_Exit_Data.csv"
+  )
+
+subway_df =
+  subway_df |>
+  clean_names() |>
+  select(
+    line,
+    station_name,
+    station_latitude,
+    station_longitude,
+    route1:route11,
+    entrance_type,
+    entry,
+    vending,
+    ada
+  ) |>
+  mutate(
+    entry = case_match(
+      entry,
+      "YES" ~ TRUE,
+      "NO" ~ FALSE
+    )
+  )
+```
+
+This data set contains information on NYC subway station entrances and exits, including subway line, station names, location, routes, entrance types, entry status, vending availability and ADA compliance. I cleaned the data by using consistent variable names, selecting the variables needed for this problem, and changing entry from a character to logical. The resulting data set has `r nrow(subway_df)` rows and `r ncol(subway_df)` columns. The data are not fully tidy because route information is spread across multiple columns rather than being stored in one variable.
+
+```{r}
+# How many distinct stations are there?
+subway_df |>
+  distinct(line, station_name) |>
+  nrow()
+```
+
+There are 465 distinct subway stations.
+
+```{r}
+# How many stations are ADA compliant?
+subway_df |>
+  filter(ada == TRUE) |>
+  distinct(line, station_name) |>
+  nrow()
+```
+
+There are 84 ADA compliant stations.
+
+```{r}
+# What proportion of station entrances / exits without vending allow entrance?
+subway_df |>
+  filter(vending == "NO") |>
+  summarize(
+    entry_proportion = mean(entry)
+  )
+```
+
+The proportion of station entrances / exits without vending that allow entrance is 0.377.
+
+```{r}
+subway_tidy_df = 
+  subway_df |>
+  mutate(
+    across(route1:route11, as.character)
+  ) |>
+  pivot_longer(
+    route1:route11,
+    names_to = "route_number",
+    values_to = "route_name"
+  )
+
+subway_tidy_df = 
+  subway_tidy_df |>
+  filter(!is.na(route_name))
+
+subway_tidy_df |>
+  filter(route_name == "A") |>
+  distinct(line, station_name) |>
+  nrow()
+
+subway_tidy_df |>
+  filter(route_name == "A", ada == TRUE) |>
+  distinct(line, station_name) |>
+  nrow()
+```
+
+There are 60 distinct stations that serve the A train, and 17 of them are ADA compliant.
+
+# Problem 2
+```{r}
+mr_trash_wheel = 
+  read_excel(
+    "data/202610 Trash Wheel Collection Data.xlsx",
+    sheet = "Mr. Trash Wheel",
+    skip = 1,
+    range = cell_cols("A:N")
+  )
+
+mr_trash_wheel = 
+  mr_trash_wheel |>
+  clean_names()
+```
+
+```{r}
+mr_trash_wheel = 
+  mr_trash_wheel |>
+  filter(!is.na(dumpster))
+```
+
+```{r}
+mr_trash_wheel = 
+  mr_trash_wheel |>
+  mutate(
+    sports_balls = as.integer(round(sports_balls))
+  )
+```
+
+```{r}
+prof_trash_wheel = 
+  read_excel(
+    "data/202610 Trash Wheel Collection Data.xlsx",
+    sheet = "Professor Trash Wheel",
+    range = cell_limits(c(2, 1), c(NA, 13))
+  )
+
+prof_trash_wheel = 
+  prof_trash_wheel |>
+  clean_names()
+```
+
+```{r}
+prof_trash_wheel =
+  prof_trash_wheel |>
+  filter(!is.na(dumpster))
+```
+
+```{r}
+gwynnda = 
+  read_excel(
+    "data/202610 Trash Wheel Collection Data.xlsx",
+    sheet = "Gwynnda the Good Wheel of the W",
+    range = cell_limits(c(2, 1), c(NA, 12))
+  )
+
+gwynnda = 
+  gwynnda |>
+  clean_names()
+```
+
+```{r}
+gwynnda =
+  gwynnda |>
+  filter(!is.na(dumpster))
+```
+
+```{r}
+prof_trash_wheel = 
+  prof_trash_wheel |>
+  mutate(
+    year = as.integer(year),
+    plastic_bottles = if_else(
+      plastic_bottles == "dive",
+      NA_character_,
+      plastic_bottles
+    ),
+    plastic_bottles = as.numeric(plastic_bottles),
+    trash_wheel = "Professor Trash Wheel"
+  )
+```
+
+```{r}
+gwynnda = 
+  gwynnda |>
+  mutate(
+    year = as.integer(year),
+    wrappers = as.numeric(wrappers),
+    trash_wheel = "Gwynnda"
+  )
+```
+
+```{r}
+mr_trash_wheel = 
+  mr_trash_wheel |>
+  mutate(
+    year = as.integer(year),
+    trash_wheel = "Mr. Trash Wheel"
+  )
+```
+
+```{r}
+trash_wheel_df = 
+  bind_rows(
+    mr_trash_wheel,
+    prof_trash_wheel,
+    gwynnda
+  )
+```
+
+```{r}
+dim(trash_wheel_df)
+```
+
+```{r}
+trash_wheel_df |>
+  filter(trash_wheel == "Professor Trash Wheel") |>
+  summarize(
+    total_weight = sum(weight_tons, na.rm = TRUE)
+  )
+```
+
+```{r}
+trash_wheel_df |>
+  filter(
+    trash_wheel == "Gwynnda",
+    year == 2022,
+    month == "June"
+  ) |>
+  summarize(
+    total_cigarette_butts = sum(cigarette_butts, na.rm = TRUE)
+  )
+```
+
+The combined Trash Wheel data set has 1269 observations and 15 variables. Some key variables include dumpster number, month, year, date, trash weight, volume, plastic bottles, cigarette butts, plastic bags, wrappers, and the Trash Wheel name. Professor Trash Wheel collected a total of 294.96 tons of trash. Gwynnda collected 18120 cigarette butts in June 2022.
+
+
+# Problem 3
+```{r}
+mci_baseline = 
+  read_csv(
+    "data/MCI_baseline.csv",
+    skip = 1
+  )
+```
+
+```{r}
+mci_baseline = 
+  mci_baseline |>
+  clean_names() |>
+  rename(age = current_age)
+```
+
+```{r}
+mci_baseline = 
+  mci_baseline |>
+  mutate(
+    sex = case_match(
+      sex,
+      0 ~ "Female",
+      1 ~ "Male"
+    ),
+    apoe4 = case_match(
+      apoe4,
+      0 ~ "Non-carrier",
+      1 ~ "Carrier"
+    )
+  )
+```
+
+```{r}
+mci_baseline = 
+  mci_baseline |>
+  mutate(
+    age_at_onset = as.numeric(na_if(age_at_onset, "."))
+  )
+```
+
+```{r}
+mci_baseline = 
+  mci_baseline |>
+  filter(
+    is.na(age_at_onset) | age_at_onset > age
+  )
+```
+
+```{r}
+mci_baseline |>
+  summarize(
+    total_participants = n(),
+    developed_mci = sum(!is.na(age_at_onset)),
+    mean_age = mean(age)
+  )
+```
+
+```{r}
+mci_baseline |>
+  filter(sex == "Female") |>
+  summarize(
+    apoe4_proportion = mean(apoe4 == "Carrier")
+  )
+```
+
+The baseline data set contains information about age, sex, education, APOE4 carrier status, and age at MCI onset. I cleaned the variable names, changed sex and APOE4 status into categorical variables, and changed MCI onset age to numeric. Four participants who already had MCI at baseline were excluded. 479 of 483 original participants were retained, and 93 developed MCI during follow-up. The average baseline age was 65.0286 years, and 30% of female participants were APOE4 carriers.
+
+```{r}
+mci_amyloid = 
+  read_csv(
+    "data/mci_amyloid.csv",
+    skip = 1
+  )
+```
+
+```{r}
+mci_amyloid =
+  mci_amyloid |>
+  clean_names() |>
+  pivot_longer(
+    baseline:time_8,
+    names_to = "time",
+    values_to = "amyloid_ratio"
+  )
+```
+
+```{r}
+mci_amyloid = 
+  mci_amyloid |>
+  mutate(
+    amyloid_ratio = as.numeric(na_if(amyloid_ratio, "Na"))
+  )
+```
+
+```{r}
+mci_baseline |>
+  anti_join(
+    mci_amyloid,
+    by = c("id" = "study_id")
+  )
+```
+
+```{r}
+mci_amyloid |>
+  anti_join(
+    mci_baseline,
+    by = c("study_id" = "id")
+  ) |>
+  distinct(study_id)
+```
+
+```{r}
+mci_df = 
+  mci_baseline |>
+  inner_join(
+    mci_amyloid,
+    by = c("id" = "study_id")
+  )
+```
+
+```{r}
+dim(mci_df)
+```
+
+```{r}
+n_distinct(mci_df$id)
+```
+
+```{r}
+write_csv(
+  mci_df,
+  "data/mci_combined.csv"
+)
+```
+
+The amyloid data set contains measurements of the amyloid β42/40 ratio at baseline and four follow_up time points. I cleaned the variable names, changed the data from wide to long format, and converted the amyloid ratio to numeric, treating "Na" as missing values.
+
+After comparing participant IDs, I found that 8 participants were only in the cleaned baseline data set, while 16 were only in the amyloid data set. I used an inner join to keep participants who appeared in both data sets. The final data set contains 2355 observations, 8 variables, and 471 distinct participants.
